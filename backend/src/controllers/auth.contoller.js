@@ -3,61 +3,104 @@ import { generateToken } from '../lib/utils.js';
 import User from '../models/user.model.js';
 import bcrypt from "bcryptjs";
 import cloudinary from '../lib/cloudinary.js';
+import { sendEmail } from "../lib/sendemail.js";
 
+const otpStore = new Map();
+const verifiedEmails = new Map();
+
+//is valid email
 const isValidEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
+// ================= SEND OTP =================
+export const sendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
 
-export const signup = async(req, res) => {
-    try {
-        const { fullName, email, password } = req.body;
-        if (!fullName || !email || !password) {
-            return res.status(400).json({ message: "All fields are required" });
-        }
-
-        if (!isValidEmail(email)) {
-            return res.status(400).json({ message: "Invalid is email" });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({ message: "Password must be at least 6 characters" });
-        }
-
-        const user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ message: "Email already exists" });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = new User({
-            fullName,
-            email,
-            password: hashedPassword
-        });
-
-        if (newUser) {
-            await newUser.save();
-            generateToken(newUser._id, res);
-
-            res.status(201).json({
-                _id: newUser._id,
-                fullName: newUser.fullName,
-                email: newUser.email,
-                profilePic: newUser.profilePic
-            });
-
-        } else {
-            res.status(400).json({ message: "Invalid user" });
-        }
-
-    } catch (error) {
-        console.log("Signup error :", error.message);
-        res.status(500).json({ message: "Internal Server Error" });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Invalid email" });
     }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    otpStore.set(email, {
+      otp,
+      expires: Date.now() + 5 * 60 * 1000,
+    });
+
+    await sendEmail(email, "OTP Code", `Your OTP is ${otp}`);
+
+    res.json({ message: "OTP sent" });
+
+  } catch (error) {
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
 };
 
+export const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const record = otpStore.get(email);
+
+    if (!record) {
+      return res.status(400).json({ message: "OTP not found" });
+    }
+
+    if (record.expires < Date.now()) {
+      otpStore.delete(email);
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    if (record.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    otpStore.delete(email);
+    verifiedEmails.set(email, true);
+
+    res.json({ message: "Email verified" });
+
+  } catch (error) {
+      console.log("Signup error :", error.message);
+    res.status(500).json({ message: "Verification failed" });
+  }
+};
+
+export const signup = async (req, res) => {
+  try {
+    const { fullName, email, password } = req.body;
+
+    // ❌ block if not verified
+    if (!verifiedEmails.get(email)) {
+      return res.status(400).json({
+        message: "Please verify OTP first",
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await User.create({
+      fullName,
+      email,
+      password: hashedPassword,
+    });
+
+    verifiedEmails.delete(email); // cleanup
+
+    generateToken(newUser._id, res);
+
+    res.status(201).json(newUser);
+
+  } catch (error) {
+    res.status(500).json({ message: "Signup failed" });
+  }
+};
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;

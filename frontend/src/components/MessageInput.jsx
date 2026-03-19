@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import imageCompression from "browser-image-compression";
 
 const MessageInput = () => {
+  let typingTimeout;
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);

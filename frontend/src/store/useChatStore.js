@@ -4,6 +4,7 @@ import { axiosInstance } from "../lib/axios.js";
 import { useAuthStore } from "../store/useAuthStore.js";
 
 export const useChatStore = create((set, get) => ({
+  typingUsers: [],
   messages: [],
   users: [],
   selectedUser: null,

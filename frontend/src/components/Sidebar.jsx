@@ -51,7 +51,7 @@ const Sidebar = () => {
           </label>
 
           <span className="text-xs text-zinc-500">
-            ({onlineUsers.length} online)
+            ({onlineUsers.length - 1}  online)
           </span>
         </div>
       </div>

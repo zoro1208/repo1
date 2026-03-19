@@ -59,6 +59,17 @@ io.on("connection", (socket) => {
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
 
+  io.on("connection", (socket) => {
+
+  socket.on("typing", ({ to }) => {
+    io.to(to).emit("typing", { from: socket.userId });
+  });
+
+  socket.on("stopTyping", ({ to }) => {
+    io.to(to).emit("stopTyping", { from: socket.userId });
+  });
+
+});
 });
 
 export { io, app, server };
