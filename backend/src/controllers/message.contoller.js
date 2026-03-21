@@ -74,6 +74,8 @@ export const sendMessage = async (req, res) => {
       fileName,
     });
 
+    console.log(file);
+
     await newMessage.save();
 
     // realtime
