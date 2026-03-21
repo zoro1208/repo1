@@ -11,9 +11,10 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
   replyingTo: null,
+  typingUsers: [],
   setReplyingTo: (msg) => set({ replyingTo: msg }),
   clearReply: () => set({ replyingTo: null }),
-
+  
   getUsers: async () => {
     set({ isUsersLoading: true });
     try {
@@ -98,6 +99,7 @@ export const useChatStore = create((set, get) => ({
     )
   });
 
+  
 });
   },
 

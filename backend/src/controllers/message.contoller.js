@@ -1,23 +1,25 @@
 import User from "../models/user.model.js";
-import Message from '../models/message.model.js';
+import Message from "../models/message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
+// ✅ GET USERS (sidebar)
 export const getUsersForSidebar = async (req, res) => {
-    try {
-        const loggedInUSerId = req.user._id;
-        const filteredUsers = await User.find({
-            _id: { $ne: loggedInUSerId }
-        }).select("-password");
+  try {
+    const loggedInUserId = req.user._id;
 
-        res.status(200).json(filteredUsers);
+    const filteredUsers = await User.find({
+      _id: { $ne: loggedInUserId },
+    }).select("-password");
 
-    } catch (error) {
-        console.error("get user sidebar error:", error.message);
-        res.status(500).json({ message: "Internal Server Error" });
-    }
+    res.status(200).json(filteredUsers);
+  } catch (error) {
+    console.error("get user sidebar error:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
 };
 
+// ✅ GET MESSAGES
 export const getMessages = async (req, res) => {
   try {
     const { id: userToChatId } = req.params;
@@ -32,22 +34,35 @@ export const getMessages = async (req, res) => {
 
     res.status(200).json(messages);
   } catch (error) {
-    console.log("Error in getMessages controller: ", error.message);
+    console.log("Error in getMessages:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
-    let imageUrl;
-    if (image) {
-      // Upload base64 image to cloudinary
-      const uploadResponse = await cloudinary.uploader.upload(image);
+    let imageUrl, fileUrl, fileName;
+
+    // For image (still base64)
+    if (req.body.image) {
+      const uploadResponse = await cloudinary.uploader.upload(req.body.image, {
+        folder: "chat_images",
+      });
       imageUrl = uploadResponse.secure_url;
+    }
+
+    // For files (PDF/DOC)
+    if (req.files?.file) {
+      const uploadResponse = await cloudinary.uploader.upload(req.files.file.tempFilePath, {
+        resource_type: "auto",
+        folder: "chat_files",
+      });
+      fileUrl = uploadResponse.secure_url;
+      fileName = req.files.file.name;
     }
 
     const newMessage = new Message({
@@ -55,49 +70,48 @@ export const sendMessage = async (req, res) => {
       receiverId,
       text,
       image: imageUrl,
+      file: fileUrl,
+      fileName,
     });
 
     await newMessage.save();
 
+    // realtime
     const receiverSocketId = getReceiverSocketId(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
-    }
+    if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", newMessage);
 
     res.status(201).json(newMessage);
   } catch (error) {
-    console.log("Error in sendMessage controller: ", error.message);
+    console.error("sendMessage error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export const deleteMessage = async (req,res) => {
+// ✅ DELETE MESSAGE
+export const deleteMessage = async (req, res) => {
   try {
-
     const { id } = req.params;
 
     const message = await Message.findById(id);
 
-    if(!message){
-      return res.status(404).json({error:"Message not found"});
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
     }
 
-    // only sender can delete
-    if(message.senderId.toString() !== req.user._id.toString()){
-      return res.status(403).json({error:"Not authorized"});
+    // ✅ only sender can delete
+    if (message.senderId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Not authorized" });
     }
 
     await Message.findByIdAndDelete(id);
 
-    // realtime delete event
+    // ✅ realtime delete
     io.emit("messageDeleted", id);
 
-    res.status(200).json({message:"Message deleted"});
+    res.status(200).json({ message: "Message deleted" });
 
   } catch (error) {
-
     console.error("Error deleting message:", error.message);
-    res.status(500).json({error:"Internal server error"});
-
+    res.status(500).json({ error: "Internal server error" });
   }
 };

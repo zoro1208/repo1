@@ -1,6 +1,6 @@
 import { useChatStore } from "../store/useChatStore.js";
 import { useEffect, useRef } from "react";
-import { Copy, Reply, Trash2 } from "lucide-react";
+import { Copy, Reply, Trash2, FileText } from "lucide-react";
 
 import ChatHeader from "./ChatHeader.jsx";
 import MessageInput from "./MessageInput.jsx";
@@ -18,22 +18,19 @@ const ChatContainer = () => {
     unsubscribeFromMessages,
     deleteMessage,
     setReplyingTo,
+    typingUsers,
   } = useChatStore();
 
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
-  // load messages
   useEffect(() => {
     if (!selectedUser?._id) return;
-
     getMessages(selectedUser._id);
     subscribeToMessages();
-
     return () => unsubscribeFromMessages();
   }, [selectedUser?._id]);
 
-  // auto scroll
   useEffect(() => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -58,11 +55,7 @@ const ChatContainer = () => {
         {messages.map((message) => (
           <div
             key={message._id}
-            className={`chat ${
-              message.senderId === authUser._id
-                ? "chat-end"
-                : "chat-start"
-            }`}
+            className={`chat ${message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
             ref={messageEndRef}
           >
             {/* AVATAR */}
@@ -87,22 +80,18 @@ const ChatContainer = () => {
             </div>
 
             {/* MESSAGE + ACTIONS */}
-            <div className="flex flex-col gap-1 group max-w-xs">
+            <div className="flex flex-col max-w-xs relative group">
+              {/* ACTION BAR (shows above bubble on hover) */}
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition mb-1">
+                {message.text && (
+                  <button
+                    onClick={() => navigator.clipboard.writeText(message.text || "")}
+                    className="bg-base-200 hover:bg-blue-500 text-blue-500 hover:text-white px-2 py-1 rounded text-xs flex items-center gap-1"
+                  >
+                    <Copy size={12} /> Copy
+                  </button>
+                )}
 
-              {/* ACTION BAR ABOVE MESSAGE */}
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-
-                {/* COPY */}
-                <button
-                  onClick={() =>
-                    navigator.clipboard.writeText(message.text || "")
-                  }
-                  className="bg-base-200 hover:bg-blue-500 text-blue-500 hover:text-white px-2 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Copy size={12} /> Copy
-                </button>
-
-                {/* REPLY */}
                 <button
                   onClick={() => setReplyingTo(message)}
                   className="bg-base-200 hover:bg-green-500 text-green-500 hover:text-white px-2 py-1 rounded text-xs flex items-center gap-1"
@@ -110,7 +99,6 @@ const ChatContainer = () => {
                   <Reply size={12} /> Reply
                 </button>
 
-                {/* DELETE */}
                 {message.senderId === authUser._id && (
                   <button
                     onClick={() => deleteMessage(message._id)}
@@ -121,22 +109,49 @@ const ChatContainer = () => {
                 )}
               </div>
 
-              {/* MESSAGE BUBBLE */}
+              {/* CHAT BUBBLE */}
               <div className="chat-bubble flex flex-col">
+                {/* IMAGE */}
                 {message.image && (
                   <img
                     src={message.image}
                     alt="Attachment"
-                    className="sm:max-w-[200px] rounded-md mb-2"
+                    className="sm:max-w-[200px] rounded-md mb-2 border"
                   />
                 )}
 
+                {/* FILE */}
+                {message.file && (
+                  <a
+                    href={message.file}
+                    download={message.fileName || "file"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-2 rounded-md border bg-base-200 hover:bg-base-300 transition mb-2"
+                  >
+                    <FileText size={16} /> {message.fileName || "Download File"}
+                  </a>
+                )}
+
+                {/* TEXT */}
                 {message.text && <p>{message.text}</p>}
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* TYPING INDICATOR */}
+      {typingUsers?.includes(selectedUser?._id) && (
+        <div className="chat chat-start">
+          <div className="chat-image avatar">
+            <div className="size-10 rounded-full border">
+              <img src={selectedUser?.profilePic || "/avatar.png"} alt="profile" />
+            </div>
+          </div>
+          <div className="chat-bubble text-sm opacity-70">typing...</div>
+        </div>
+      )}
 
       <MessageInput />
     </div>

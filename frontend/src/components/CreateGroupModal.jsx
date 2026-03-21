@@ -3,6 +3,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useGroupStore } from "../store/useGroupStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { Users, X } from "lucide-react";
+import toast from "react-hot-toast";
 
 const CreateGroupModal = () => {
   const { users } = useChatStore();
@@ -22,8 +23,10 @@ const CreateGroupModal = () => {
   };
 
   const handleCreate = () => {
-    if (!groupName || selectedMembers.length === 0) return;
-
+    if (!groupName || selectedMembers.length === 0) {
+      toast.error("Group name or users cannot be empty");
+      return;
+}
     createGroup({
       name: groupName,
       members: selectedMembers,
@@ -108,7 +111,7 @@ const CreateGroupModal = () => {
 
             {/* FOOTER */}
             <div className="p-4 border-t border-base-300">
-              <button onClick={handleCreate} className="btn btn-ghost w-full">
+              <button onClick={handleCreate} className="btn btn-ghost bg-yellow-800 w-full">
                 Create Group
               </button>
             </div>
